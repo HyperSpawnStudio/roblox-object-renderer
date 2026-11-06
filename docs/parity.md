@@ -79,12 +79,22 @@ macOS 14 or later):
   `CAPTURE_VIEWPORT` (1644 x 1116 px) is 822 x 558 points on a Retina display. Resizing the window to it
   goes through System Events, which needs the Accessibility permission (or resize it by hand until
   `ror studio status` shows that viewport).
+- **The camera's Focus.** Studio's editor camera on macOS turns a scripted camera to face
+  `Camera.Focus` once the script returns, so setting a view also moves the Focus onto its line of sight
+  (without it the shapes fixture's default view came back turned several degrees: 18 % within 8).
+- **Edit quality.** Studio's Automatic edit quality on macOS draws below level 21 (no Neon glow, Glass
+  without refraction), so a capture session pins `EditQualityLevel` at level 21 and `ror studio close`
+  puts the earlier value back.
 - `ror studio open` starts another Studio process with the capture place (`-task EditFile`), as on
-  Windows; `ror studio close` ends it.
+  Windows; `ror studio close` ends it. Both pick the newest Studio install by its executable's date
+  (the updater's `~/Library/Roblox/UnzippedBundle`, else `/Applications` or `~/Applications`).
 
-Checked on Apple Silicon with Studio 0.746 (2026-11-06): the window lookup, scale and viewport location
-against an open Studio (`ror studio status`, and the marker found at the viewport's full 3058 x 1534 px).
-`ror studio open` and a full `ror compare` in a capture Studio have not been run on macOS yet.
+Measured on Apple Silicon with Studio 0.746 (2026-11-06), a capture Studio opened with `ror studio open`,
+recaptured (`ROR_RECAPTURE=1`): `tools/parity.py` gives within 2 / within 8 of R15 93.0 / 98.5 %, R6
+94.2 / 98.9 %, catalog gear and hats 93.3-94.6 / 98.8-99.6 %; the shapes fixture's default, iso,
+front and top views 92.5 / 98.3, 91.1 / 98.5, 95.0 / 98.8 and 86.6 / 94.3 %. What remains is mostly
+1 px silhouette edges, faint sky noise and ambient-occlusion halos; the top view's sky also shows a
+moon ror leaves out. ror's rules were calibrated on Windows captures, not refit to these.
 
 ## Agreement
 

@@ -36,6 +36,9 @@ mod warm;
 #[cfg(test)]
 mod tests;
 
+#[cfg(target_os = "macos")]
+pub use studio::newest_mac_app;
+
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};

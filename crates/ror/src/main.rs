@@ -1255,6 +1255,13 @@ fn studio(command: StudioCommand) -> Result<()> {
 			#[cfg(any(windows, target_os = "macos"))]
 			{
 				let studio = CaptureStudio::connect()?;
+				// the edit quality captures pinned, back to what it was before Studio saves its settings
+				#[cfg(target_os = "macos")]
+				let mut studio = studio;
+				#[cfg(target_os = "macos")]
+				if let Err(error) = studio.luau(ror::studio::compare::UNPIN_QUALITY) {
+					eprintln!("ror: putting back the capture Studio's edit quality: {error:#}");
+				}
 				let window = studio.window()?;
 				let pid = ror::studio::capture::window_process(window.hwnd);
 				println!("closing {} (process {pid})", studio.name);

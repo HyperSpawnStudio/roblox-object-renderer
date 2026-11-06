@@ -3,8 +3,8 @@
 //! Detection order: [`crate::AssetConfig::studio_content`], env `ROR_ROBLOX_CONTENT` (the `content`
 //! folder or the version folder containing it), the registry value
 //! `HKCU\Software\Roblox\RobloxStudio\ContentFolder`, then the newest
-//! `%LOCALAPPDATA%\Roblox\Versions\*\RobloxStudioBeta.exe` (on macOS, `RobloxStudio.app` in
-//! `/Applications` or `~/Applications`).
+//! `%LOCALAPPDATA%\Roblox\Versions\*\RobloxStudioBeta.exe` (on macOS the newest `RobloxStudio.app`,
+//! [`newest_mac_app`]).
 //!
 //! Lookup order for `rbxasset://<path>`: `PlatformContent/pc/<path>`, `content/<path>`,
 //! `ExtraContent/<path>`. In every install on this machine (12 versions) no relative path exists
@@ -56,14 +56,34 @@ pub(crate) fn detect(explicit: Option<&Path>) -> Option<StudioInstall> {
 	newest_install().as_deref().and_then(StudioInstall::from_dir)
 }
 
-/// The app's `Contents/Resources`, which holds `content`, `PlatformContent` and `ExtraContent` as a
-/// Windows version folder does: in `/Applications`, else the user's `~/Applications`.
+/// The newest app's `Contents/Resources` ([`newest_mac_app`]), which holds `content`,
+/// `PlatformContent` and `ExtraContent` as a Windows version folder does.
 #[cfg(target_os = "macos")]
 fn newest_install() -> Option<PathBuf> {
-	let resources = |applications: PathBuf| applications.join("RobloxStudio.app").join("Contents").join("Resources");
-	let system = resources(PathBuf::from("/Applications"));
-	let user = std::env::var_os("HOME").map(|home| resources(PathBuf::from(home).join("Applications")));
-	[Some(system), user].into_iter().flatten().find(|dir| dir.join("content").is_dir())
+	newest_mac_app().map(|app| app.join("Contents").join("Resources")).filter(|dir| dir.join("content").is_dir())
+}
+
+/// macOS: the newest `RobloxStudio.app`, by its executable's modification time (the Windows lookup's
+/// rule), of the one Studio's updater keeps in `~/Library/Roblox/UnzippedBundle` (the build Studio
+/// runs: 0.746.0.7461269 there while `/Applications` still held 0.746.0.7461264, 2026-11-06),
+/// `/Applications` and `~/Applications`.
+#[cfg(target_os = "macos")]
+pub fn newest_mac_app() -> Option<PathBuf> {
+	let home = std::env::var_os("HOME").map(PathBuf::from);
+	newest_app([home.as_ref().map(|home| home.join("Library").join("Roblox").join("UnzippedBundle")), Some(PathBuf::from("/Applications")), home.map(|home| home.join("Applications"))].into_iter().flatten())
+}
+
+/// The `RobloxStudio.app` in `dirs` whose executable was modified last.
+#[cfg(any(target_os = "macos", test))]
+fn newest_app(dirs: impl IntoIterator<Item = PathBuf>) -> Option<PathBuf> {
+	dirs.into_iter()
+		.map(|dir| dir.join("RobloxStudio.app"))
+		.filter_map(|app| {
+			let modified = app.join("Contents").join("MacOS").join("RobloxStudio").metadata().ok()?.modified().unwrap_or(std::time::UNIX_EPOCH);
+			Some((modified, app))
+		})
+		.max_by_key(|(modified, _)| *modified)
+		.map(|(_, app)| app)
 }
 
 /// Newest `%LOCALAPPDATA%\Roblox\Versions\<v>` holding `RobloxStudioBeta.exe`, as its `content`.
@@ -119,6 +139,24 @@ fn registry_content_folder() -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+	#[test]
+	fn the_newest_mac_app_wins() {
+		let dir = std::env::temp_dir().join(format!("ror-assets-mac-apps-{}", std::process::id()));
+		let _ = std::fs::remove_dir_all(&dir);
+		let app = |name: &str, age_days: u64| {
+			let executable = dir.join(name).join("RobloxStudio.app").join("Contents").join("MacOS").join("RobloxStudio");
+			std::fs::create_dir_all(executable.parent().unwrap()).unwrap();
+			let file = std::fs::File::create(&executable).unwrap();
+			file.set_modified(std::time::SystemTime::now() - std::time::Duration::from_secs(age_days * 86400)).unwrap();
+			dir.join(name)
+		};
+		let (launcher, updated, empty) = (app("Applications", 4), app("UnzippedBundle", 2), dir.join("none"));
+		assert_eq!(newest_app([launcher.clone(), updated.clone(), empty.clone()]), Some(updated.join("RobloxStudio.app")));
+		assert_eq!(newest_app([launcher.clone(), empty.clone()]), Some(launcher.join("RobloxStudio.app")));
+		assert_eq!(newest_app([empty]), None);
+		let _ = std::fs::remove_dir_all(&dir);
+	}
 
 	#[test]
 	fn lookup_order() {

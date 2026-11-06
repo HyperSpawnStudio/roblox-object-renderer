@@ -147,15 +147,11 @@ fn lock_capture_studio() -> Result<std::fs::File> {
 	Ok(file)
 }
 
-/// macOS: Studio's executable in /Applications, else ~/Applications.
+/// macOS: the newest installed Studio's executable ([`ror_assets::newest_mac_app`]: the updater's
+/// build, not an older launcher copy in /Applications).
 #[cfg(target_os = "macos")]
 pub fn studio_executable() -> Option<std::path::PathBuf> {
-	let home = std::env::var_os("HOME").map(std::path::PathBuf::from);
-	[Some(std::path::PathBuf::from("/Applications")), home.map(|home| home.join("Applications"))]
-		.into_iter()
-		.flatten()
-		.map(|dir| dir.join("RobloxStudio.app").join("Contents").join("MacOS").join("RobloxStudio"))
-		.find(|path| path.is_file())
+	ror_assets::newest_mac_app().map(|app| app.join("Contents").join("MacOS").join("RobloxStudio")).filter(|path| path.is_file())
 }
 
 /// RobloxStudioBeta.exe of the newest installed Studio version.

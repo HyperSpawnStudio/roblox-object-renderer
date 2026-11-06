@@ -172,6 +172,42 @@ for _, name in {"ViewSelectorScreenGui", "RojoNotifications"} do
 end
 game:GetService("Selection"):Set({})"#;
 
+/// Luau that sets the capture Studio's camera to `camera` ([`CaptureSession::set_camera`]). On macOS
+/// it also moves `Camera.Focus` onto the new line of sight: Studio's editor camera there turns a
+/// scripted camera to face the old Focus once the script returns (shapes, default view: 18 % of the
+/// pixels within 8 levels of ror's, 96 % with the Focus moved). Windows captures keep the Focus they
+/// were measured with.
+fn camera_script(camera: &crate::render::camera::Camera) -> String {
+	let c = camera.cframe_components();
+	let focus = if cfg!(target_os = "macos") { "camera.Focus = camera.CFrame * CFrame.new(0, 0, -20)\n" } else { "" };
+	format!(
+		"{HIDE_OVERLAYS}
+local camera = workspace.CurrentCamera
+camera.CameraType = Enum.CameraType.Scriptable
+camera.FieldOfView = {}
+camera.CFrame = CFrame.new({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+{focus}return 0",
+		camera.fov, c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8], c[9], c[10], c[11]
+	)
+}
+
+/// Luau that pins the capture Studio's edit quality at level 21, the quality ror draws, keeping the
+/// value before in `_G` until [`UNPIN_QUALITY`] puts it back (`ror studio close`). On macOS Studio's
+/// Automatic edit quality draws below it: no Neon glow, Glass without refraction (shapes, default
+/// view: 96 % of the pixels within 8 levels of ror's at Automatic, 98 % at level 21).
+#[cfg(target_os = "macos")]
+pub const PIN_QUALITY: &str = "local r = settings().Rendering
+_G.RorEditQuality = _G.RorEditQuality or r.EditQualityLevel
+r.EditQualityLevel = Enum.QualityLevel.Level21
+return tostring(r.EditQualityLevel)";
+
+/// Puts back the edit quality [`PIN_QUALITY`] changed (Studio keeps it for every place it opens).
+#[cfg(target_os = "macos")]
+pub const UNPIN_QUALITY: &str = "local r = settings().Rendering
+if _G.RorEditQuality then r.EditQualityLevel = _G.RorEditQuality end
+_G.RorEditQuality = nil
+return tostring(r.EditQualityLevel)";
+
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ViewReport {
@@ -380,6 +416,8 @@ return provider.RequestQueueSize",
 	/// Puts the capture Studio's window back to the capture viewport; the viewport's size in physical
 	/// pixels.
 	fn size_window(studio: &mut CaptureStudio) -> Result<(u32, u32)> {
+		#[cfg(target_os = "macos")]
+		studio.luau(PIN_QUALITY).context("pinning the capture Studio's edit quality")?;
 		let mut window = studio.window()?;
 		let (mut logical_width, mut logical_height) = studio.viewport()?;
 		// the capture Studio is ror's own: a window someone maximized or resized goes back to the
@@ -516,16 +554,7 @@ return 0")).context("setting the capture lighting")?;
 	}
 
 	pub fn set_camera(&mut self, camera: &crate::render::camera::Camera) -> Result<()> {
-		let c = camera.cframe_components();
-		self.studio()?.luau(&format!(
-			"{HIDE_OVERLAYS}
-local camera = workspace.CurrentCamera
-camera.CameraType = Enum.CameraType.Scriptable
-camera.FieldOfView = {}
-camera.CFrame = CFrame.new({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
-return 0",
-			camera.fov, c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8], c[9], c[10], c[11]
-		))?;
+		self.studio()?.luau(&camera_script(camera))?;
 		Ok(())
 	}
 
@@ -706,4 +735,25 @@ pub fn compare_files(a: &Path, b: &Path) -> Result<PixelMetrics> {
 		bail!("sizes differ: {wa}x{ha} vs {wb}x{hb}");
 	}
 	Ok(metrics(&pa, &pb))
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::render::camera::Camera;
+	use glam::{Affine3A, Vec3};
+
+	#[test]
+	fn the_camera_script_moves_the_focus_onto_the_line_of_sight_on_macos() {
+		let eye = Vec3::new(10.0, 8.0, 12.0);
+		let camera = Camera { eye, world: Affine3A::from_translation(eye), fov: 70.0, near: 0.1 };
+		let script = camera_script(&camera);
+		let cframe = script.find("camera.CFrame = CFrame.new(10, 8, 12, 1, 0, 0, 0, 1, 0, 0, 0, 1)").expect("the CFrame is set");
+		match script.find("camera.Focus = camera.CFrame * CFrame.new(0, 0, -20)") {
+			// after the CFrame, ahead of the camera (it looks down -Z)
+			Some(focus) => assert!(cfg!(target_os = "macos") && focus > cframe, "{script}"),
+			None => assert!(!cfg!(target_os = "macos"), "{script}"),
+		}
+		assert!(script.ends_with("return 0"));
+	}
 }

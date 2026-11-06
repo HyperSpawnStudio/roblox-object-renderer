@@ -10,7 +10,7 @@ import os
 import subprocess
 import sys
 
-ROR = os.path.join("target", "release", "ror.exe")
+ROR = os.path.join("target", "release", "ror.exe" if os.name == "nt" else "ror")
 # Studio's rigs, from the content folder ror reads (ROR_ROBLOX_CONTENT: Studio's `content` folder)
 STUDIO_AVATAR = os.path.join(os.environ.get("ROR_ROBLOX_CONTENT", "content"), "avatar", "characterR15.rbxm")
 

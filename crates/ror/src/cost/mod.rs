@@ -14,7 +14,7 @@ pub mod grid;
 pub mod images;
 pub mod meshes;
 pub mod report;
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 pub mod studio;
 
 use std::collections::{BTreeMap, HashMap, HashSet};

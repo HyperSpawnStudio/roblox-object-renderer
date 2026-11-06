@@ -1191,7 +1191,7 @@ fn video(mut args: VideoArgs) -> Result<()> {
 	Ok(())
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 use ror::studio::capture::CAPTURE_WINDOW;
 
 fn studio(command: StudioCommand) -> Result<()> {
@@ -1207,7 +1207,7 @@ fn studio(command: StudioCommand) -> Result<()> {
 					let _ = studio.viewport();
 					return Ok(());
 				}
-				#[cfg(windows)]
+				#[cfg(any(windows, target_os = "macos"))]
 				{
 					let window = studio.window()?;
 					let pid = ror::studio::capture::window_process(window.hwnd);
@@ -1223,7 +1223,11 @@ fn studio(command: StudioCommand) -> Result<()> {
 			output::write_atomic(&path, &place::build_with(&environment, !pre2022, mesh_lods)?)?;
 			let exe = ror::studio::studio_executable().context("Roblox Studio is not installed")?;
 			// Studio must not inherit this process's pipes (a caller reading them would wait for Studio)
-			std::process::Command::new(exe)
+			let mut launch = std::process::Command::new(exe);
+			// macOS: Studio's executable opens a place file only through its EditFile task
+			#[cfg(target_os = "macos")]
+			launch.arg("-task").arg("EditFile").arg("-localPlaceFile");
+			launch
 				.arg(&path)
 				.stdin(std::process::Stdio::null())
 				.stdout(std::process::Stdio::null())
@@ -1234,7 +1238,7 @@ fn studio(command: StudioCommand) -> Result<()> {
 			for _ in 0..90 {
 				std::thread::sleep(std::time::Duration::from_secs(2));
 				if let Ok(mut studio) = CaptureStudio::connect() {
-					#[cfg(windows)]
+					#[cfg(any(windows, target_os = "macos"))]
 					if let Ok(window) = studio.window() {
 						// whole logical pixels for the viewport at 150 % scaling (1644 x 1116)
 						ror::studio::capture::resize(window.hwnd, CAPTURE_WINDOW.0, CAPTURE_WINDOW.1)?;
@@ -1248,7 +1252,7 @@ fn studio(command: StudioCommand) -> Result<()> {
 			bail!("the capture Studio did not appear in the MCP's Studio list within 3 minutes")
 		}
 		StudioCommand::Close => {
-			#[cfg(windows)]
+			#[cfg(any(windows, target_os = "macos"))]
 			{
 				let studio = CaptureStudio::connect()?;
 				let window = studio.window()?;
@@ -1269,6 +1273,11 @@ fn studio(command: StudioCommand) -> Result<()> {
 				for child in ror::studio::capture::children(window.hwnd).iter().filter(|child| child.visible && child.width >= 200 && child.height >= 150) {
 					println!("  child {} {}x{} at {},{} {:?}", child.class, child.width, child.height, child.x, child.y, child.title);
 				}
+			}
+			#[cfg(target_os = "macos")]
+			{
+				let window = studio.window()?;
+				println!("window {}x{} px at {},{} dpi {} (process {})", window.width, window.height, window.x, window.y, window.dpi, window.pid);
 			}
 			Ok(())
 		}
@@ -1306,7 +1315,7 @@ fn studio(command: StudioCommand) -> Result<()> {
 			Ok(())
 		}
 		StudioCommand::Capture { out } => {
-			#[cfg(windows)]
+			#[cfg(any(windows, target_os = "macos"))]
 			{
 				let mut studio = CaptureStudio::connect()?;
 				let (width, height, rgba) = studio.capture_viewport()?;
@@ -1314,17 +1323,17 @@ fn studio(command: StudioCommand) -> Result<()> {
 				println!("{} ({width}x{height})", out.display());
 				Ok(())
 			}
-			#[cfg(not(windows))]
+			#[cfg(not(any(windows, target_os = "macos")))]
 			{
 				let _ = out;
-				bail!("viewport capture needs Windows")
+				bail!("viewport capture needs Windows or macOS")
 			}
 		}
 	}
 }
 
 fn compare(args: CompareArgs) -> Result<()> {
-	#[cfg(windows)]
+	#[cfg(any(windows, target_os = "macos"))]
 	{
 		let name = args.input.file_stem().map(|stem| stem.to_string_lossy().to_string()).unwrap_or_else(|| "compare".into());
 		let out = args.out.unwrap_or_else(|| output::repo_dir().join("out").join("compare").join(name));
@@ -1365,10 +1374,10 @@ fn compare(args: CompareArgs) -> Result<()> {
 		println!("{}", serde_json::to_string_pretty(&report)?);
 		Ok(())
 	}
-	#[cfg(not(windows))]
+	#[cfg(not(any(windows, target_os = "macos")))]
 	{
 		let _ = args;
-		bail!("compare needs Windows (Studio capture)")
+		bail!("compare needs Windows or macOS (Studio capture)")
 	}
 }
 
@@ -1545,7 +1554,7 @@ fn cost(mut args: CostArgs) -> Result<()> {
 	#[allow(unused_mut)]
 	let (mut width, mut height) = parse_size(&args.size)?;
 	// --check: Studio's viewport decides the shape of the views (what is in view)
-	#[cfg(windows)]
+	#[cfg(any(windows, target_os = "macos"))]
 	if args.check {
 		(width, height) = ror::studio::capture::CAPTURE_VIEWPORT;
 	}
@@ -1690,10 +1699,10 @@ fn cost(mut args: CostArgs) -> Result<()> {
 		}
 	}
 	if args.check {
-		#[cfg(windows)]
+		#[cfg(any(windows, target_os = "macos"))]
 		cost_check(&args, &read_document()?, &result, &report, &out, width, height)?;
-		#[cfg(not(windows))]
-		bail!("--check needs Windows (the capture Studio)");
+		#[cfg(not(any(windows, target_os = "macos")))]
+		bail!("--check needs Windows or macOS (the capture Studio)");
 	}
 	Ok(())
 }
@@ -1762,7 +1771,7 @@ fn cost_compare(report: &serde_json::Value, dir: &std::path::Path) -> Result<Vec
 }
 
 /// `ror cost --check`: the views measured in the capture Studio, beside the model's counts.
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 fn cost_check(args: &CostArgs, document: &ror::scene::load::Document, result: &serde_json::Value, report: &serde_json::Value, out: &std::path::Path, width: u32, height: u32) -> Result<()> {
 	use ror::studio::compare::{CaptureSession, material_bytes, model_bytes};
 	let mut scene = ror::scene::extract::extract(document);

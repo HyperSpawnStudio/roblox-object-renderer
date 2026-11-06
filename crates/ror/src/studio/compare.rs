@@ -277,7 +277,7 @@ pub fn material_bytes(document: &scene::load::Document, materials: &scene::Mater
 }
 
 /// A model loaded into the capture Studio, captured under any lighting and camera.
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 pub struct CaptureSession<'a> {
 	/// None: offline, captures only come from the cache ([`offline_studio`])
 	pub studio: Option<&'a mut CaptureStudio>,
@@ -313,7 +313,7 @@ pub fn offline_studio() -> Option<String> {
 	std::env::var("ROR_CAPTURE_OFFLINE").ok().filter(|identity| identity.contains('|'))
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 impl<'a> CaptureSession<'a> {
 	/// A session over the capture cache alone, for the Studio and materials `identity` names
 	/// ([`offline_studio`]) at the capture Studio's viewport size.
@@ -578,7 +578,7 @@ pub fn derived_images() -> bool {
 	std::env::var_os("ROR_DIFF_IMAGES").is_some_and(|value| value != "0")
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 pub fn run(renderer: &Renderer, options: &CompareOptions) -> Result<CompareReport> {
 	// a file, else an asset id or content URI (as `ror render` takes them)
 	let mut document = if options.input.is_file() {
@@ -641,7 +641,7 @@ pub fn run(renderer: &Renderer, options: &CompareOptions) -> Result<CompareRepor
 }
 
 /// Each view captured in Studio and drawn by ror ([`run`]); the assets ror missed.
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 fn compare_views(renderer: &Renderer, options: &CompareOptions, scene: &scene::Scene, session: &mut CaptureSession, width: u32, height: u32) -> Result<(Vec<ViewReport>, Vec<String>)> {
 	std::fs::create_dir_all(&options.out)?;
 	let mut reports = Vec::new();

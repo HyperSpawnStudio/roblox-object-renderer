@@ -96,8 +96,8 @@ Linux is not tested ([docs/building.md](docs/building.md)). Interfaces (flags, t
   without collision support; Terrain Clouds are drawn with a generic model that is not calibrated
   against Studio ([docs/rendering.md](docs/rendering.md) "Clouds"); and the calibration experiments
   built on test assets that are not published are left out ([docs/parity.md](docs/parity.md)).
-- Parity work (`ror compare`, `ror studio`, `ror cost --check`) needs Roblox Studio on Windows and a
-  Studio MCP bridge, which is not part of this repository.
+- Parity work (`ror compare`, `ror studio`, `ror cost --check`) needs Roblox Studio on Windows or macOS
+  (calibration: Windows) and a Studio MCP bridge, which is not part of this repository.
 
 ## Contributing, security and license
 

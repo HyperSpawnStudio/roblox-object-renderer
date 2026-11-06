@@ -3,21 +3,20 @@
 ror's rules are measured, not guessed: a dedicated capture Studio renders the same fixtures, and ror
 is compared with it pixel by pixel, or with Studio's own counters for `ror cost`. The code is in
 `crates/ror/src/studio`: `mod.rs` (the capture Studio), `place.rs` (the capture place), `capture.rs`
-(capturing its viewport, Windows only), `compare.rs`, `export.rs`, `mcp.rs` (the bridge client) and
-`calibrate.rs` with `calibrate/*` (the experiments).
+and `capture_mac.rs` (capturing its viewport on Windows and macOS), `compare.rs`, `export.rs`, `mcp.rs`
+(the bridge client) and `calibrate.rs` with `calibrate/*` (the experiments, Windows only).
 
 ## What you need
 
-- Roblox Studio on Windows (captures read the viewport's pixels from its window).
+- Roblox Studio on Windows or macOS (captures read the viewport's pixels from its window; on macOS see
+  [below](#macos)). Calibration (`ror studio calibrate`) needs Windows.
 - A Studio MCP bridge: an MCP server reached over TCP (JSON-RPC, one message a line) that lists the
   open Studios and runs Luau in one of them by id, through the tools `list_roblox_studios` and
   `execute_luau` (`studio_id`, `datamodel_type`, `code`). Set `ROR_STUDIO_MCP` to its address
   (`host:port`, or a port on 127.0.0.1). It only ever needs to listen on localhost (see
   [SECURITY.md](../SECURITY.md)). On macOS, rur's `tools/studio-mcp-bridge.mjs` is one: it serves
   Studio's own StudioMCP on a local port (`node ../roblox-ui-renderer/tools/studio-mcp-bridge.mjs
-  --port 44755`, then `ROR_STUDIO_MCP=44755`). There, read-only exports (`ror studio export`,
-  `ror render <path> --studio <name>`) need only the bridge; captures, compares and calibration still
-  need Windows.
+  --port 44755`, then `ROR_STUDIO_MCP=44755`).
 - Nothing else for the offline half: stored captures replay without a Studio (below).
 
 ## The capture Studio
@@ -61,6 +60,31 @@ material generation: a rerun only renders ror's side. `ROR_RECAPTURE=1` captures
 `ROR_CAPTURE_OFFLINE="<version>|<materials>"` replays stored captures without a Studio.
 Several capture Studios can run side by side (`ROR_CAPTURE_PLACE=<name>`); each is driven by one
 process at a time (a lock file). Analysis scripts: `tools/analysis/`.
+
+## macOS
+
+`capture_mac.rs` captures with ScreenCaptureKit through `tools/maccap/maccap.swift` (embedded in ror and
+compiled on first use into `<state dir>/maccap/` with `swiftc`, from Xcode or the Command Line Tools;
+macOS 14 or later):
+
+- **Screen Recording permission** for the app that runs ror, in System Settings > Privacy & Security.
+  Without it Studio's window titles are unreadable and captures fail.
+- **Lossless sRGB.** The capture asks for sRGB output, which returns the values Studio drew (256 random
+  colours and a full-viewport fill came back exact on a P3 display, 2026-11-06). `screencapture -l`
+  colour-matches into the display's space instead (sRGB 255,0,255 came back as 234,51,247).
+- **Finding the viewport.** It has no window of its own, so the first capture puts a full-viewport
+  magenta frame under CoreGui, finds it in a capture of the window and removes it; later captures crop
+  that rectangle until the window or viewport changes size.
+- **Scale.** `Camera.ViewportSize` is in points and captures are at the display's backing scale, so
+  `CAPTURE_VIEWPORT` (1644 x 1116 px) is 822 x 558 points on a Retina display. Resizing the window to it
+  goes through System Events, which needs the Accessibility permission (or resize it by hand until
+  `ror studio status` shows that viewport).
+- `ror studio open` starts another Studio process with the capture place (`-task EditFile`), as on
+  Windows; `ror studio close` ends it.
+
+Checked on Apple Silicon with Studio 0.746 (2026-11-06): the window lookup, scale and viewport location
+against an open Studio (`ror studio status`, and the marker found at the viewport's full 3058 x 1534 px).
+`ror studio open` and a full `ror compare` in a capture Studio have not been run on macOS yet.
 
 ## Agreement
 

@@ -727,6 +727,7 @@ mod tests {
 	}
 
 	#[test]
+	#[cfg_attr(not(windows), ignore = "memory admission reads free memory on Windows only (crate::available_memory); off elsewhere, docs/building.md")]
 	fn a_job_that_does_not_fit_has_the_caches_relieved_then_queues_until_the_running_ones_end() {
 		let _turn = TURN.lock();
 		let first = admit("first", None, bytes(MIN_JOB), &|_| 0).unwrap();
@@ -800,6 +801,7 @@ mod tests {
 	}
 
 	#[test]
+	#[cfg_attr(not(windows), ignore = "memory admission reads free memory on Windows only (crate::available_memory); off elsewhere, docs/building.md")]
 	fn a_job_short_of_memory_tells_its_caller_why_once_and_gives_up_after_the_wait() {
 		let _turn = TURN.lock();
 		let first = admit("first", None, bytes(MIN_JOB), &|_| 0).unwrap();
@@ -824,6 +826,7 @@ mod tests {
 	}
 
 	#[test]
+	#[cfg_attr(not(windows), ignore = "memory admission reads free memory on Windows only (crate::available_memory); off elsewhere, docs/building.md")]
 	fn a_job_whose_caller_has_gone_stops_waiting_for_memory() {
 		let _turn = TURN.lock();
 		let first = admit("first", None, bytes(MIN_JOB), &|_| 0).unwrap();

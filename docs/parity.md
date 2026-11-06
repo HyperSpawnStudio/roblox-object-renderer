@@ -11,9 +11,13 @@ is compared with it pixel by pixel, or with Studio's own counters for `ror cost`
 - Roblox Studio on Windows (captures read the viewport's pixels from its window).
 - A Studio MCP bridge: an MCP server reached over TCP (JSON-RPC, one message a line) that lists the
   open Studios and runs Luau in one of them by id, through the tools `list_roblox_studios` and
-  `execute_luau` (`studio_id`, `datamodel_type`, `code`). The bridge is not part of this repository;
-  set `ROR_STUDIO_MCP` to its address (`host:port`, or a port on 127.0.0.1). It only ever needs to
-  listen on localhost (see [SECURITY.md](../SECURITY.md)).
+  `execute_luau` (`studio_id`, `datamodel_type`, `code`). Set `ROR_STUDIO_MCP` to its address
+  (`host:port`, or a port on 127.0.0.1). It only ever needs to listen on localhost (see
+  [SECURITY.md](../SECURITY.md)). On macOS, rur's `tools/studio-mcp-bridge.mjs` is one: it serves
+  Studio's own StudioMCP on a local port (`node ../roblox-ui-renderer/tools/studio-mcp-bridge.mjs
+  --port 44755`, then `ROR_STUDIO_MCP=44755`). There, read-only exports (`ror studio export`,
+  `ror render <path> --studio <name>`) need only the bridge; captures, compares and calibration still
+  need Windows.
 - Nothing else for the offline half: stored captures replay without a Studio (below).
 
 ## The capture Studio

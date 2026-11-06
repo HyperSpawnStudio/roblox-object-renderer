@@ -3,6 +3,7 @@
 // moved by ZOffset), largest Size, how far its particles moved since they spawned along the view, on
 // average, and where it falls in ror's order and in the order without that move:
 //   cargo run -p ror --release --example tools -- vfx_order <batch dir> <moment label, e.g. t0.1> [path filter]
+#[cfg(windows)]
 pub fn main() -> anyhow::Result<()> {
 	use anyhow::Context;
 	use ror::render::camera::CameraSpec;
@@ -63,4 +64,10 @@ pub fn main() -> anyhow::Result<()> {
 		println!("{place:3} {mirrored_place:3}  {:60} {:8.3} {:7.3} {:7.3} {:5} {:5.1} {:5.1}", row.path.chars().rev().take(60).collect::<String>().chars().rev().collect::<String>(), row.distance, row.largest, row.offset, row.count, row.emission, row.brightness);
 	}
 	Ok(())
+}
+
+// The Studio calibration and capture modules are Windows-only (src/studio/mod.rs)
+#[cfg(not(windows))]
+pub fn main() -> anyhow::Result<()> {
+	anyhow::bail!("vfx_order needs Windows: it uses the calibration timeline (ror::studio::calibrate)")
 }

@@ -2,6 +2,7 @@
 // show larger than the view or reach the camera (CPU only: the batch's model, playback, camera and
 // Studio's frame times, simulated, nothing drawn):
 //   cargo run -p ror --release --example tools -- vfx_big <batch dir> <moment label, e.g. t0.1> [share of the view]
+#[cfg(windows)]
 pub fn main() -> anyhow::Result<()> {
 	use anyhow::Context;
 	use ror::render::camera::CameraSpec;
@@ -62,4 +63,10 @@ pub fn main() -> anyhow::Result<()> {
 		}
 	}
 	Ok(())
+}
+
+// The Studio calibration and capture modules are Windows-only (src/studio/mod.rs)
+#[cfg(not(windows))]
+pub fn main() -> anyhow::Result<()> {
+	anyhow::bail!("vfx_big needs Windows: it uses the calibration timeline (ror::studio::calibrate)")
 }
